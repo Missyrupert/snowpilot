@@ -1,0 +1,96 @@
+.mv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  flex-direction: column;
+}
+
+.mv-close {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  align-self: flex-start;
+  margin: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--bg-dark);
+  background: var(--cold);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.mv-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  min-height: 0;
+}
+
+.mv-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mv-image {
+  max-width: 100%;
+  max-height: calc(100dvh - 80px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.mv-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+}
+
+.mv-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--cold);
+  border-radius: 50%;
+  animation: mv-spin 0.7s linear infinite;
+}
+
+@keyframes mv-spin {
+  to { transform: rotate(360deg); }
+}
+
+.mv-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.mv-fallback-btn {
+  display: inline-block;
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--bg-dark);
+  background: var(--accent);
+  border-radius: 8px;
+  text-decoration: none;
+  min-height: 48px;
+}
