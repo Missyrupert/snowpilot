@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { REGIONS, UNIVERSAL_RULES, type Region } from './data/regionData';
 import { MapViewer } from './components/MapViewer';
+import { RoutePlotter } from './components/RoutePlotter';
 import './App.css';
 
 const grouped = {
@@ -90,6 +91,14 @@ export function App() {
           onClose={() => setMapOpen(false)}
         />
       )}
+
+      <RoutePlotter
+        homeRegionId={selected?.id ?? null}
+        onFromAlignRegion={(regionId) => {
+          const r = REGIONS.find((reg) => reg.id === regionId);
+          if (r) setSelected(r);
+        }}
+      />
 
       {/* ── Universal Survival Card ──────────────────────────── */}
       <section className="survival-card">
