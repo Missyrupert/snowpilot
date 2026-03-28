@@ -4,15 +4,14 @@ import {
   findAlternateRoutes,
   formatRouteNodeLine,
   type RouteOption,
+  type SortMode,
 } from '../lib/routeFinder';
 import './RoutePlotter.css';
 
 const sortedNodes = [...ROUTE_NODES].sort((a, b) => a.name.localeCompare(b.name));
 
 export interface RoutePlotterProps {
-  /** Synced from the main “Where are you?” picker when that region is on the travel graph */
   homeRegionId?: string | null;
-  /** When the user picks a **From** that matches a full survival region, align the main picker + detail card */
   onFromAlignRegion?: (regionId: string | null) => void;
 }
 
@@ -20,6 +19,7 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
   const [fromId, setFromId] = useState('');
   const [toId, setToId] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [sortMode, setSortMode] = useState<SortMode>('fewest');
 
   useEffect(() => {
     if (!homeRegionId || !isRouteNodeId(homeRegionId)) return;
@@ -28,28 +28,29 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
 
   useEffect(() => {
     setSelectedIdx(0);
-  }, [fromId, toId]);
+  }, [fromId, toId, sortMode]);
 
   const displayRoutes = useMemo(() => {
     if (!fromId || !toId || fromId === toId) return [];
-    return findAlternateRoutes(fromId, toId);
-  }, [fromId, toId]);
+    return findAlternateRoutes(fromId, toId, sortMode);
+  }, [fromId, toId, sortMode]);
 
-  const safeIdx =
-    displayRoutes.length > 0 ? Math.min(selectedIdx, displayRoutes.length - 1) : 0;
-  const activeIdx = displayRoutes.length > 0 ? safeIdx : 0;
+  const activeIdx = displayRoutes.length > 0 ? Math.min(selectedIdx, displayRoutes.length - 1) : 0;
   const selectedRoute: RouteOption | undefined = displayRoutes[activeIdx];
+
+  const routeSummary = () => {
+    if (displayRoutes.length === 0) return null;
+    const count = displayRoutes.length;
+    const label = sortMode === 'fewest' ? 'fewest crossings first' : 'safest/easiest first';
+    if (count === 1) return `1 path found — ${label}.`;
+    return `${count} paths found — showing ${label}.`;
+  };
 
   return (
     <section className="route-plotter" aria-labelledby="route-plotter-heading">
       <h2 id="route-plotter-heading" className="route-plotter-title">
-        Route plotter
+        Get from A to B
       </h2>
-      <p className="route-plotter-hint">
-        <strong>From</strong> follows <strong>Where are you?</strong> when that region is in the travel graph; you
-        can change it here (e.g. a transition). Pick <strong>To</strong> for the destination. Multiple paths show
-        as route tabs ranked by rough travel cost.
-      </p>
 
       <div className="route-plotter-fields">
         <div className="route-field">
@@ -64,7 +65,7 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
               if (id) onFromAlignRegion?.(id);
             }}
           >
-            <option value="">Start here…</option>
+            <option value="">Where are you?</option>
             {sortedNodes.map((n) => (
               <option key={n.id} value={n.id}>
                 {n.name}
@@ -80,7 +81,7 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
             value={toId}
             onChange={(e) => setToId(e.target.value)}
           >
-            <option value="">Destination…</option>
+            <option value="">Where do you want to go?</option>
             {sortedNodes.map((n) => (
               <option key={n.id} value={n.id}>
                 {n.name}
@@ -90,39 +91,57 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
         </div>
       </div>
 
+      {fromId && toId && fromId !== toId && (
+        <div className="route-sort-toggle" role="group" aria-label="Sort routes by">
+          <span className="route-sort-label">Sort by</span>
+          <button
+            type="button"
+            className={`sort-btn ${sortMode === 'fewest' ? 'sort-btn-active' : ''}`}
+            onClick={() => setSortMode('fewest')}
+          >
+            Quickest (fewest stops)
+          </button>
+          <button
+            type="button"
+            className={`sort-btn ${sortMode === 'easiest' ? 'sort-btn-active' : ''}`}
+            onClick={() => setSortMode('easiest')}
+          >
+            Easiest (safest path)
+          </button>
+        </div>
+      )}
+
       {fromId && toId && fromId !== toId && displayRoutes.length === 0 && (
         <p className="route-empty" role="status">
-          No path in the current graph between these places. Try nearby regions or check the wiki
-          map — we can add missing links in <code>routeGraph.ts</code>.
+          No path found between these two places. They may not be directly connected in the world map — try a nearby region as a stepping stone.
         </p>
       )}
 
       {displayRoutes.length > 0 && (
         <div className="route-results">
           <p className="route-results-summary" role="status">
-            {displayRoutes.length === 1
-              ? 'One route through the graph.'
-              : `${displayRoutes.length} routes — pick the one that fits your gear and weather.`}
+            {routeSummary()}
           </p>
 
-          <ul className="route-tabs" role="tablist" aria-label="Route options">
-            {displayRoutes.map((_, i) => (
-              <li key={i} role="presentation">
-                <button
-                  type="button"
-                  role="tab"
-                  id={`route-tab-${i}`}
-                  aria-selected={activeIdx === i}
-                  aria-controls={`route-panel-${i}`}
-                  className={`route-tab ${activeIdx === i ? 'route-tab-active' : ''}`}
-                  onClick={() => setSelectedIdx(i)}
-                >
-                  {displayRoutes.length === 1 ? 'Route' : `Route ${i + 1}`}
-                  {i === 0 && displayRoutes.length > 1 ? ' · suggested' : ''}
-                </button>
-              </li>
-            ))}
-          </ul>
+          {displayRoutes.length > 1 && (
+            <ul className="route-tabs" role="tablist" aria-label="Route options">
+              {displayRoutes.map((route, i) => (
+                <li key={i} role="presentation">
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`route-tab-${i}`}
+                    aria-selected={activeIdx === i}
+                    aria-controls={`route-panel-${i}`}
+                    className={`route-tab ${activeIdx === i ? 'route-tab-active' : ''}`}
+                    onClick={() => setSelectedIdx(i)}
+                  >
+                    {i === 0 ? '★ ' : ''}{route.edges.length} {route.edges.length === 1 ? 'stop' : 'stops'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {selectedRoute && (
             <div
@@ -144,8 +163,7 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
                 ))}
               </ol>
               <p className="route-meta">
-                ~{selectedRoute.edges.length} crossing{selectedRoute.edges.length === 1 ? '' : 's'} · score{' '}
-                {selectedRoute.totalWeight.toFixed(1)} (lower = fewer / milder segments in this model)
+                {selectedRoute.edges.length} {selectedRoute.edges.length === 1 ? 'crossing' : 'crossings'} · {selectedRoute.nodes.length} {selectedRoute.nodes.length === 1 ? 'region' : 'regions'}
               </p>
             </div>
           )}

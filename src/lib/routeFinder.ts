@@ -2,11 +2,12 @@ import type { RouteEdge } from '../data/routeGraph';
 import { ROUTE_EDGES, getRouteNode } from '../data/routeGraph';
 
 export interface RouteOption {
-  /** Ordered node ids from start to end */
   nodes: string[];
   edges: RouteEdge[];
   totalWeight: number;
 }
+
+export type SortMode = 'fewest' | 'easiest';
 
 type AdjEntry = { to: string; edge: RouteEdge };
 
@@ -25,22 +26,19 @@ function buildAdjacency(): Map<string, AdjEntry[]> {
 
 const adjacency = buildAdjacency();
 
-/**
- * Enumerate simple paths (no repeated nodes) up to limits, then rank by total weight.
- * Graph is small; this yields sensible "alternate routes" like map apps.
- */
 export function findAlternateRoutes(
   fromId: string,
   toId: string,
+  sortMode: SortMode = 'fewest',
   opts?: {
     maxRoutes?: number;
     maxDepth?: number;
     maxRawPaths?: number;
   }
 ): RouteOption[] {
-  const maxRoutes = opts?.maxRoutes ?? 5;
+  const maxRoutes = opts?.maxRoutes ?? 8;
   const maxDepth = opts?.maxDepth ?? 22;
-  const maxRawPaths = opts?.maxRawPaths ?? 80;
+  const maxRawPaths = opts?.maxRawPaths ?? 200;
 
   if (fromId === toId) return [];
 
@@ -73,7 +71,18 @@ export function findAlternateRoutes(
 
   const seen = new Set<string>();
   const unique: RouteOption[] = [];
-  for (const r of raw.sort((a, b) => a.totalWeight - b.totalWeight || a.nodes.length - b.nodes.length)) {
+
+  const sorted = raw.sort((a, b) => {
+    if (sortMode === 'fewest') {
+      // Primary: fewest crossings. Secondary: lowest weight.
+      return a.edges.length - b.edges.length || a.totalWeight - b.totalWeight;
+    } else {
+      // Primary: lowest weight (easiest/safest). Secondary: fewest crossings.
+      return a.totalWeight - b.totalWeight || a.edges.length - b.edges.length;
+    }
+  });
+
+  for (const r of sorted) {
     const key = r.nodes.join('>');
     if (seen.has(key)) continue;
     seen.add(key);
