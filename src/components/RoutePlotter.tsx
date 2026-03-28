@@ -3,6 +3,7 @@ import { ROUTE_NODES, isRouteNodeId } from '../data/routeGraph';
 import {
   findAlternateRoutes,
   formatRouteNodeLine,
+  getDirections,
   type RouteOption,
   type SortMode,
 } from '../lib/routeFinder';
@@ -20,6 +21,7 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
   const [toId, setToId] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [sortMode, setSortMode] = useState<SortMode>('fewest');
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (!homeRegionId || !isRouteNodeId(homeRegionId)) return;
@@ -37,6 +39,15 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
 
   const activeIdx = displayRoutes.length > 0 ? Math.min(selectedIdx, displayRoutes.length - 1) : 0;
   const selectedRoute: RouteOption | undefined = displayRoutes[activeIdx];
+
+  useEffect(() => {
+    setExpandedStep(null);
+  }, [fromId, toId, sortMode, activeIdx]);
+
+  const toggleStep = (i: number) => {
+    if (!selectedRoute || i >= selectedRoute.edges.length) return;
+    setExpandedStep((prev) => (prev === i ? null : i));
+  };
 
   const routeSummary = () => {
     if (displayRoutes.length === 0) return null;
@@ -151,16 +162,54 @@ export function RoutePlotter({ homeRegionId, onFromAlignRegion }: RoutePlotterPr
               aria-labelledby={`route-tab-${activeIdx}`}
             >
               <ol className="route-steps">
-                {selectedRoute.nodes.map((id: string, step: number) => (
-                  <li key={`${id}-${step}`} className="route-step">
-                    <span className="route-step-name">{formatRouteNodeLine(id)}</span>
-                    {step < selectedRoute.edges.length && (
-                      <span className="route-step-crossing">
-                        → {selectedRoute.edges[step].label}
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {selectedRoute.nodes.map((id: string, step: number) => {
+                  const hasLeg = step < selectedRoute.edges.length;
+                  const nextId = hasLeg ? selectedRoute.nodes[step + 1] : null;
+                  const written = nextId ? getDirections(id, nextId) : null;
+                  const directionsText =
+                    written ??
+                    (nextId
+                      ? `Head toward ${formatRouteNodeLine(nextId)} and watch for environmental cues marking the transition.`
+                      : null);
+                  const expanded = expandedStep === step;
+                  return (
+                    <li
+                      key={`${id}-${step}`}
+                      className={`route-step${hasLeg ? ' route-step--interactive' : ''}`}
+                      onClick={() => toggleStep(step)}
+                      onKeyDown={(e) => {
+                        if (!hasLeg) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleStep(step);
+                        }
+                      }}
+                      role={hasLeg ? 'button' : undefined}
+                      tabIndex={hasLeg ? 0 : undefined}
+                      aria-expanded={hasLeg ? expanded : undefined}
+                      aria-label={
+                        hasLeg
+                          ? expanded
+                            ? `Step ${step + 1}: ${formatRouteNodeLine(id)}, directions expanded`
+                            : `Step ${step + 1}: ${formatRouteNodeLine(id)}, tap for directions`
+                          : undefined
+                      }
+                    >
+                      <span className="route-step-name">{formatRouteNodeLine(id)}</span>
+                      {expanded && directionsText && (
+                        <p className="route-step-directions">{directionsText}</p>
+                      )}
+                      {hasLeg && (
+                        <span className="route-step-crossing">
+                          → {selectedRoute.edges[step].label}
+                        </span>
+                      )}
+                      {hasLeg && !expanded && (
+                        <span className="route-step-tap-hint">Tap for directions ↓</span>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
               <p className="route-meta">
                 {selectedRoute.edges.length} {selectedRoute.edges.length === 1 ? 'crossing' : 'crossings'} · {selectedRoute.nodes.length} {selectedRoute.nodes.length === 1 ? 'region' : 'regions'}
